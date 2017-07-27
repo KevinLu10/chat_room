@@ -43,6 +43,7 @@ def doConnectionLost(conn):
     '''当客户端断开连接时，调用该方法'''
     sessionno = conn.transport.sessionno
     lost_client(sessionno)
+    #群发房间人数
 
 
 # 重写客户端连接和断开的方法
@@ -113,13 +114,14 @@ def hb_1003(_conn, data):
 class dispatch(resource.Resource):
     '''分发消息'''
 
-    def get_dispatch_list(self, room_id, user_id):
+    def get_dispatch_list(self, room_id, user_ids):
         list_ = []
-        if user_id:
-            sessionno = session_id_cache.get(user_id)
-            data = client_data_cache.get(sessionno)
-            if data and data.get('room_id') == room_id:
-                list_ = [sessionno]
+        if user_ids:
+            for user_id in user_ids:
+                sessionno = session_id_cache.get(user_id)
+                data = client_data_cache.get(sessionno)
+                if data and data.get('room_id') == room_id:
+                    list_.append(sessionno)
         else:
             list_ = room_online_cache.lrange_all(room_id)
         return list(set(list_))
@@ -127,11 +129,11 @@ class dispatch(resource.Resource):
     @util.check_response
     def render(self, request):
         room_id = util.args_get(request.args, 'room_id', 0)
-        user_id = util.args_get(request.args, 'user_id', 0)
+        user_ids = util.args_get(request.args, 'user_id', '').split(',')
         msg = util.args_get(request.args, 'msg', '')
         if not msg:
             return True
-        list_ = self.get_dispatch_list(room_id, user_id)
+        list_ = self.get_dispatch_list(room_id, user_ids)
         print list_
         if list_:
             GlobalObject().netfactory.pushObject(1005, msg, list_)
