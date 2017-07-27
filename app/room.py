@@ -23,10 +23,10 @@ def doConnectionMade(conn):
     # GlobalObject().netfactory.pushObject(10001, str2, lis)  # 向其他客户端发送上线消息
 
 
-def lost_client(sessionno):
+def lost_client(sessionno, is_push_online_cnt=0):
     """断开客户端连接的处理逻辑"""
     reg_cache.delete(sessionno)
-    data = client_data_cache.get(sessionno)
+    data = client_data_cache.get(sessionno) or {}
     client_data_cache.delete(sessionno)
     online_cache.remove('online', sessionno)
 
@@ -37,18 +37,30 @@ def lost_client(sessionno):
             room_id = data.get('room_id')
             if room_id:
                 room_online_cache.remove(room_id, sessionno)
+                if is_push_online_cnt:
+                    push_oinline_cnt(room_id, sessionno)
+    return data
 
 
 def doConnectionLost(conn):
     '''当客户端断开连接时，调用该方法'''
     sessionno = conn.transport.sessionno
-    lost_client(sessionno)
-    #群发房间人数
+    lost_client(sessionno, is_push_online_cnt=1)
 
 
 # 重写客户端连接和断开的方法
 GlobalObject().netfactory.doConnectionMade = doConnectionMade
 GlobalObject().netfactory.doConnectionLost = doConnectionLost
+
+
+def push_oinline_cnt(room_id, exclude_sessionno):
+    # 通知房间的所有客户端，房间人数改变
+    sessionnos = list(set(room_online_cache.lrange_all(room_id)))
+    online_cnt = len(sessionnos)
+    if exclude_sessionno in sessionnos:
+        sessionnos.remove(exclude_sessionno)
+    GlobalObject().netfactory.pushObject(1004, json.dumps(dict(online_cnt=online_cnt)), sessionnos)
+    return online_cnt
 
 
 @netserviceHandle
@@ -70,12 +82,7 @@ def reg_1001(_conn, param):
         client_data_cache.set(sessionno, data)
         session_id_cache.set(user_id, sessionno)
         reg_cache.set(sessionno, '1')
-    # 通知房间的所有客户端，房间人数改变
-    sessionnos = list(set(room_online_cache.lrange_all(room_id)))
-    if sessionno in sessionnos:
-        sessionnos.remove(sessionno)
-    online_cnt = len(sessionnos)
-    GlobalObject().netfactory.pushObject(1004, json.dumps(dict(online_cnt=online_cnt)), sessionnos)
+    online_cnt = push_oinline_cnt(room_id, sessionno)
     return dict(online_cnt=online_cnt)
 
 
