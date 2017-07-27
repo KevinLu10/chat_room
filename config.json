@@ -1,0 +1,31 @@
+{
+  "master": {
+    "roothost": "localhost",
+    "rootport": 9999,
+    "webport": 9998
+  },
+  "servers": {
+    "chatserver": {
+      "netport": 1001,
+      "webport": 1002,
+      "rootport": 2002,
+      "name": "chat",
+      "app": "app.room"
+    }
+
+  },
+  "db": {
+    "host": "localhost",
+    "user": "root",
+    "passwd": "111",
+    "port": 3306,
+    "db": "test",
+    "charset": "utf8"
+  },
+  "memcached": {
+    "urls": [
+      "127.0.0.1:11211"
+    ],
+    "hostname": "test"
+  }
+}
