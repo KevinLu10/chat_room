@@ -1,14 +1,18 @@
 # encoding=utf8
 import json
 
+
 def get_return_str(ext):
     """获取返回给客户端的字符串"""
     return json.dumps(dict(code=ext.code, message=ext.message))
+
+
 class CusError(Exception):
     code = 0
     message = ''
 
-
+    def __init__(self, message):
+        self.message = message
 
 
 class ServerError(CusError):
@@ -39,6 +43,12 @@ class NoRegError(CusError):
     """连接没有注册"""
     code = 10003
     message = u'连接没有注册'
+
+
+class ParamError(CusError):
+    '''参数异常'''
+    code = 10004
+    message = u'参数异常'
 
 
 if __name__ == '__main__':

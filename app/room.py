@@ -10,17 +10,7 @@ from twisted.web import resource
 from . import mongo_client
 from . import config
 from . import util
-
-
-def doConnectionMade(conn):
-    pass
-    # '''当有客户端连接时，调用该方法'''
-    # str1 = 'welcome\r\n'
-    # GlobalObject().netfactory.pushObject(10001, str1, [conn.transport.sessionno])  # 向登录的客户端发送欢迎信息
-    # str2 = '%d is login\r\n' % conn.transport.sessionno
-    # lis = GlobalObject().netfactory.connmanager._connections.keys()  # 获取所有连接的客户端的session_no
-    # lis.remove(conn.transport.sessionno)  # 移除当前登录的客户端的session_no
-    # GlobalObject().netfactory.pushObject(10001, str2, lis)  # 向其他客户端发送上线消息
+from . import exception as ext
 
 
 def lost_client(sessionno, is_push_online_cnt=0):
@@ -49,7 +39,7 @@ def doConnectionLost(conn):
 
 
 # 重写客户端连接和断开的方法
-GlobalObject().netfactory.doConnectionMade = doConnectionMade
+# GlobalObject().netfactory.doConnectionMade = doConnectionMade
 GlobalObject().netfactory.doConnectionLost = doConnectionLost
 
 
@@ -108,7 +98,7 @@ def get_offline_msg_1002(_conn, param):
 @util.check_response
 @util.data_to_json
 @util.check_reg
-def hb_1003(_conn, data):
+def hb_1003(_conn, param):
     '''心跳'''
     sessionno = _conn.transport.sessionno
     data = client_data_cache.get(sessionno)
@@ -134,7 +124,7 @@ def send_msg_1006(_conn, param):
 
 
 @webserviceHandle('dispatch')
-class dispatch(resource.Resource):
+class Dispatch(resource.Resource):
     '''分发消息'''
 
     def get_dispatch_list(self, room_id, user_ids):
@@ -151,13 +141,18 @@ class dispatch(resource.Resource):
 
     @util.check_response
     def render(self, request):
-        room_id = util.args_get(request.args, 'room_id', 0)
-        user_ids = util.args_get(request.args, 'user_id', '').split(',')
-        msg = util.args_get(request.args, 'msg', '')
-        if not msg:
-            return True
+        room_id = util.args_get(request.args, 'room_id')
+        user_id = util.args_get(request.args, 'user_id')
+        msg = util.args_get(request.args, 'msg')
+        if room_id is None:
+            raise ext.ParamError('invalid room_id')
+        if user_id is None:
+            raise ext.ParamError('invalid user_id')
+        if msg is None:
+            raise ext.ParamError('invalid msg')
+        user_ids = user_id.split(',')
+
         list_ = self.get_dispatch_list(room_id, user_ids)
-        print list_
         if list_:
             GlobalObject().netfactory.pushObject(1005, msg, list_)
         mongo_client['msg_%s' % room_id].insert({'timestamp': util.get_timestamp(), 'msg': msg})
@@ -165,16 +160,35 @@ class dispatch(resource.Resource):
 
 
 @webserviceHandle('room/close')
-class close_room(resource.Resource):
+class CloseRoom(resource.Resource):
     '''销毁房间'''
 
     @util.check_response
     def render(self, request):
-        room_id = util.args_get(request.args, 'room_id', 0)
+        room_id = util.args_get(request.args, 'room_id')
+        if room_id is None:
+            raise ext.ParamError('invalid room_id')
+
         mongo_client['msg_%s' % room_id].remove()
         sessionnos = room_online_cache.lrange_all(room_id)
         for sessionno in sessionnos:
             GlobalObject().netfactory.loseConnection(sessionno)
             lost_client(sessionno)
         room_online_cache.delete(room_id)
+        return True
+
+
+@webserviceHandle('room/kick')
+class KickUser(resource.Resource):
+    '''踢人'''
+
+    @util.check_response
+    def render(self, request):
+        user_id = util.args_get(request.args, 'user_id')
+        if user_id is None:
+            raise ext.ParamError('invalid user_id')
+        sessionno = session_id_cache.get(user_id)
+        if sessionno is not None:
+            GlobalObject().netfactory.loseConnection(sessionno)
+            lost_client(sessionno)
         return True
