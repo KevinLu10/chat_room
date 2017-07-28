@@ -117,6 +117,22 @@ def hb_1003(_conn, data):
     return True
 
 
+@netserviceHandle
+@util.check_response
+@util.data_to_json
+@util.check_reg
+def send_msg_1006(_conn, param):
+    '''发送消息'''
+    sessionno = _conn.transport.sessionno
+    client_data = client_data_cache.get(sessionno)
+    room_id = client_data['room_id']
+    sessionnos = room_online_cache.lrange_all(room_id)
+    if sessionno in sessionnos:
+        sessionnos.remove(sessionno)
+    GlobalObject().netfactory.pushObject(1006, json.dumps(param), sessionnos)
+    return True
+
+
 @webserviceHandle('dispatch')
 class dispatch(resource.Resource):
     '''分发消息'''

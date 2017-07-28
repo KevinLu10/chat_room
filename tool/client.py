@@ -9,6 +9,7 @@ import json
 COMMAND_ID_REG = 1001
 COMMAND_ID_GET_OFFLINE_MSG = 1002
 COMMAND_ID_HB = 1003
+COMMAND_ID_CLIENT_MSG = 1006
 
 
 def send_data(sendstr, commandId):
@@ -36,6 +37,12 @@ def rec_one_pk(conn):
     cmd_id = head[7]
     pk = conn.recv(lenght)
     return cmd_id, pk
+
+
+def send_client_msg(conn):
+    """发送客户端消息"""
+    data = json.dumps(dict(msg='hello kevin'))
+    conn.sendall(send_data(data, COMMAND_ID_CLIENT_MSG))  # 向服务器发送消息
 
 
 def send_hb(conn):
@@ -101,6 +108,7 @@ class ChatServer:
     def run(self):
         if reg(self.conn, room_id, user_id):
             get_offline_msg(self.conn, offline_timestamp)
+            send_client_msg(self.conn)
             start_new(send_hb, (self.conn,))
             start_new(rec_msg, (self.conn,))
 
